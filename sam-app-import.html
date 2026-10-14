@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>山姆 App 商品导入器 · 好物清单</title>
+<style>
+:root{color-scheme:light;--ink:#20251f;--muted:#697169;--line:#e3e8e1;--green:#1b684b;--paper:#f5f7f3;--card:#fff}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:920px;margin:0 auto;padding:26px 16px 70px}.eyebrow{font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:var(--green);font-weight:800}
+h1{margin:.35rem 0 .6rem;font-size:clamp(26px,5vw,38px);line-height:1.15;letter-spacing:-.04em}
+p{margin:.5rem 0;color:var(--muted)}.panel{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:18px;margin:16px 0;box-shadow:0 8px 28px rgba(25,48,30,.035)}
+h2{font-size:18px;margin:0 0 8px}label{font-weight:650;display:block;margin:12px 0 6px}
+input[type=file],textarea{width:100%;padding:12px;border:1px solid #d3dcd1;border-radius:10px;background:#fff;color:var(--ink);font:inherit}
+textarea{min-height:150px;resize:vertical;font:12px/1.5 ui-monospace,SFMono-Regular,monospace}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:12px}
+button,.btn{border:0;border-radius:999px;padding:11px 17px;font:inherit;font-weight:700;cursor:pointer;background:var(--green);color:#fff}
+button.secondary{background:#edf3ed;color:#28533c;border:1px solid #d7e3d7}
+button:disabled{opacity:.45;cursor:not-allowed}
+.note{background:#f2f7f1;border:1px solid #dae8d7;border-radius:12px;padding:12px;color:#37543e;font-size:13px}
+.warn{background:#fff8e8;border-color:#f1dfb3;color:#735722}
+.stats{display:flex;gap:10px;flex-wrap:wrap}.stat{padding:10px 14px;border-radius:12px;background:#f2f5f0;min-width:110px}.stat b{display:block;font-size:23px}
+table{width:100%;border-collapse:collapse;font-size:13px;margin-top:10px}th,td{text-align:left;padding:9px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--muted);font-weight:650}td.price{white-space:nowrap;font-variant-numeric:tabular-nums}
+.preview{overflow-x:auto}.thumb{width:48px;height:48px;object-fit:contain;background:#f4f5f2;border-radius:8px}
+.hidden{display:none!important}.small{font-size:12px;color:var(--muted)}
+a{color:var(--green)}footer{font-size:12px;color:var(--muted);margin-top:22px}
+@media(min-width:700px){.layout{display:grid;grid-template-columns:1fr 1fr;gap:16px}.layout .panel{margin:0}}
+</style>
+</head>
+<body>
+<main>
+<div class="eyebrow">SAM GLOBAL BUY · LOCAL IMPORT TOOL</div>
+<h1>从山姆 App 导入真实商品</h1>
+<p>把你通过正常登录使用山姆 App 时获得的商品列表 JSON，或包含该响应的 HAR 文件，转换成“好物清单”可以直接导入的 CSV。</p>
+<div class="note"><b>隐私说明：</b>这个页面在你的浏览器本地处理文件，不会把文件、登录信息或商品数据上传到服务器。请勿把包含 auth-token、Cookie 或个人信息的 HAR 发给他人；导出的 CSV 只包含商品展示字段。</div>
+<div class="layout">
+<section class="panel">
+<h2>01 · 选择数据文件</h2>
+<p>支持山姆商品列表接口的 JSON 响应、JSON 文件，或浏览器/代理工具导出的 HAR（.har / .json）。请确保响应来自 App 的“全球购”商品列表，而非普通商品分类。</p>
+<label for="file">商品 JSON / HAR 文件</label>
+<input id="file" type="file" accept=".json,.har,application/json,application/har+json">
+<div class="actions"><button id="readFile" type="button">读取并识别商品</button><button id="clear" class="secondary" type="button">清空</button></div>
+</section>
+<section class="panel">
+<h2>02 · 或粘贴响应 JSON</h2>
+<p>如果你已经复制了接口的 Response Body，可直接粘贴响应内容。只需要响应 JSON，不需要请求头或登录凭据。</p>
+<label for="raw">Response Body</label>
+<textarea id="raw" placeholder='粘贴完整 JSON，例如包含 data.dataList、title、priceInfo 的响应……'></textarea>
+<div class="actions"><button id="parseText" type="button">解析粘贴内容</button></div>
+</section>
+</div>
+<section id="result" class="panel hidden">
+<h2>03 · 识别结果</h2>
+<div class="stats"><div class="stat"><b id="count">0</b><span>件有效商品</span></div><div class="stat"><b id="withImages">0</b><span>件包含图片</span></div><div class="stat"><b id="withoutPrice">0</b><span>未识别价格</span></div></div>
+<p id="message"></p>
+<div class="preview"><table><thead><tr><th>图片</th><th>商品名称</th><th>分类 / 品牌</th><th>价格</th><th>商品ID</th></tr></thead><tbody id="rows"></tbody></table></div>
+<div class="actions"><button id="download" type="button">下载 CSV，导入选品后台</button><button id="downloadJson" class="secondary" type="button">下载标准化 JSON</button></div>
+<p class="small">价格根据响应里的 priceInfo（优先 priceType=1）转换；如果接口没有返回现价，不会编造价格。导入前请在 App 里核对库存、规格和最终价。</p>
+</section>
+<section class="panel">
+<h2>如何使用</h2>
+<ol>
+<li>在山姆 App 正常进入“全球购”，打开你要整理的商品列表。</li>
+<li>通过你已有的合法数据导出方式，保存该列表请求的 JSON 响应，或导出包含响应正文的 HAR。不要绕过登录、验证码或访问限制。</li>
+<li>在本页面选择文件并解析，检查商品名称、价格和图片，再下载 CSV。</li>
+<li>回到好物清单的组织者后台 → 商品管理 → 导入 CSV。重复导入前请先检查，当前版本不会自动合并重复商品。</li>
+</ol>
+<div class="note warn"><b>实时同步的限制：</b>山姆 App 目前没有向普通开发者公开的商品目录 API 文档。此工具做的是基于你已授权访问的 App 响应导入，不代表实时接口已经连通，也不会把价格自动持续刷新。若要定时同步，需先确认接口使用条件，并把访问凭据只保存在私有后端，而不是 GitHub 或公开网页。</div>
+</section>
+<footer>好物清单 · 双十一全球购 · 本地数据转换工具</footer>
+</main>
+<script>
+(function(){
+  const $=id=>document.getElementById(id);
+  let records=[];
+  function safeStr(v){return v==null?'':String(v).trim()}
+  function numeric(v){
+    if(typeof v==='number') return Number.isFinite(v)?v:null;
+    if(typeof v==='string'){const s=v.replace(/[￥¥,\s]/g,'');if(!s)return null;const n=Number(s);return Number.isFinite(n)?n:null}
+    return null;
+  }
+  function normalizeUrl(v){
+    if(Array.isArray(v)) v=v[0];
+    if(v&&typeof v==='object') v=v.url||v.imageUrl||v.src||v.imgUrl||v.originUrl||v.big;
+    let s=safeStr(v);if(s.startsWith('//'))s='https:'+s;return /^https?:\/\//i.test(s)?s:'';
+  }
+  function firstImage(o){
+    const keys=['imageUrl','mainImage','mainImageUrl','image','imgUrl','picUrl','pictureUrl','spuImage','spuImg','goodsImage','cover','coverUrl','imageUrlList','imageList','images','pictures','smallImage','bigImage','itemImageList','picture'];
+    for(const k of keys){if(o[k]){let v=o[k];if(Array.isArray(v)){for(const a of v){const u=normalizeUrl(a);if(u)return u}}else{const u=normalizeUrl(v);if(u)return u}}}
+    return '';
+  }
+  function getPrice(o){
+    if(Array.isArray(o.priceInfo)&&o.priceInfo.length){
+      let items=o.priceInfo;
+      const preferred=items.find(p=>Number(p.priceType)===1)||items.find(p=>p.price!=null)||items[0];
+      const n=numeric(preferred&&preferred.price);
+      if(n!=null)return n/100;
+    }
+    for(const k of ['salePrice','currentPrice','memberPrice','price','sellingPrice','realPrice','lowestPrice']){
+      const n=numeric(o[k]); if(n!=null&&n>=0)return n>999?n/100:n;
+    }
+    if(o.price&&typeof o.price==='object'){const n=numeric(o.price.amount||o.price.value);if(n!=null)return n>999?n/100:n}
+    return null;
+  }
+  function categoryOf(o){
+    let c=safeStr(o.categoryName||o.category||o.categoryName2||o.categoryName1);
+    if(!c&&o.componentPath){try{const x=typeof o.componentPath==='string'?JSON.parse(o.componentPath):o.componentPath;c=x.category3_name&&x.category3_name!=='全部'?x.category3_name:(x.category2_name||x.category1_name||'')}catch{}}
+    return c||'全球购';
+  }
+  function extractBodies(root){
+    const bodies=[];
+    if(root&&root.log&&Array.isArray(root.log.entries)){
+      for(const e of root.log.entries){
+        const url=safeStr(e.request&&e.request.url);
+        const content=e.response&&e.response.content;
+        if(!content||!content.text)continue;
+        if(url.includes('api-sams.walmartmobile.cn')||url.toLowerCase().includes('goods')||url.toLowerCase().includes('product')){
+          try{
+            let t=content.text;
+            if(content.encoding==='base64'){const bin=atob(t);const bytes=Uint8Array.from(bin,c=>c.charCodeAt(0));t=new TextDecoder('utf-8').decode(bytes)}
+            bodies.push(JSON.parse(t));
+          }catch{}
+        }
+      }
+    }
+    if(root&&root.data!==undefined)bodies.push(root);
+    if(Array.isArray(root))bodies.push(root);
+    if(!bodies.length)bodies.push(root);
+    return bodies;
+  }
+  function productLike(o){
+    if(!o||typeof o!=='object'||Array.isArray(o))return false;
+    const name=safeStr(o.title||o.goodsName||o.productName||o.spuName||o.name);
+    if(name.length<2||name.length>240)return false;
+    const price=getPrice(o);
+    const id=safeStr(o.spuId||o.skuId||o.productId||o.goodsId||o.id);
+    return price!=null&&price>=0&&(Boolean(id)||Boolean(firstImage(o)));
+  }
+  function walk(root,out,seen,depth){
+    if(depth>25||root==null)return;
+    if(Array.isArray(root)){for(const x of root)walk(x,out,seen,depth+1);return}
+    if(typeof root!=='object')return;
+    if(productLike(root)){
+      const name=safeStr(root.title||root.goodsName||root.productName||root.spuName||root.name);
+      const price=getPrice(root);const id=safeStr(root.spuId||root.skuId||root.productId||root.goodsId||root.id);
+      const image=firstImage(root);const key=(id||name)+'|'+price;
+      if(!seen.has(key)){
+        seen.add(key);
+        const brand=safeStr(root.brandName||root.brand||root.brandNameEn);
+        const sub=safeStr(root.subTitle||root.subtitle||root.description||root.sellingPoint||root.spuDesc);
+        const url=safeStr(root.shareUrl||root.productUrl||root.detailUrl||root.h5Url||root.url);
+        out.push({id,name,price,image_url:image,category:categoryOf(root),brand,tag:'山姆 App 导入',product_url:/^https?:\/\//i.test(url)?url:'',description:[sub,id?'山姆商品ID：'+id:'','来源：山姆 App 商品列表响应'].filter(Boolean).join(' · ')});
+      }
+    }
+    for(const [k,v] of Object.entries(root)){
+      if(['priceInfo','stockInfo','skuList','specList','promotionList'].includes(k)&&Array.isArray(v))continue;
+      walk(v,out,seen,depth+1);
+    }
+  }
+  function parsePriceMissing(root,depth=0){
+    if(depth>25||root==null)return 0;
+    if(Array.isArray(root))return root.reduce((n,x)=>n+parsePriceMissing(x,depth+1),0);
+    if(typeof root!=='object')return 0;
+    const name=safeStr(root.title||root.goodsName||root.productName||root.spuName||root.name);
+    const id=safeStr(root.spuId||root.skuId||root.productId||root.goodsId||root.id);
+    if(name.length>1&&id&&getPrice(root)==null)return 1;
+    return Object.values(root).reduce((n,x)=>n+parsePriceMissing(x,depth+1),0);
+  }
+  function parsePayload(root){
+    const found=[],seen=new Set(),bodies=extractBodies(root);
+    bodies.forEach(b=>walk(b,found,seen,0));
+    found.sort((a,b)=>a.name.localeCompare(b.name,'zh-CN'));
+    const unique=[];const dedup=new Set();for(const x of found){const k=x.id||x.name+'|'+x.price;if(!dedup.has(k)){dedup.add(k);unique.push(x)}}
+    records=unique;render(parsePriceMissing(root));
+  }
+  function render(noPrice){
+    $('result').classList.remove('hidden');$('count').textContent=records.length;
+    $('withImages').textContent=records.filter(p=>p.image_url).length;
+    $('withoutPrice').textContent=noPrice;
+    $('message').textContent=records.length?'识别完成。请抽查名称、图片和价格后下载；金额以 App 最终结算页为准。':'没有识别到包含名称和价格的商品。请确认文件里有商品列表接口的 Response Body；仅有请求头或只有 HAR 元数据是不够的。';
+    $('rows').innerHTML=records.slice(0,100).map(p=>'<tr><td>'+(p.image_url?'<img class="thumb" src="'+esc(p.image_url)+'" loading="lazy" referrerpolicy="no-referrer">':'—')+'</td><td>'+esc(p.name)+'</td><td>'+esc([p.category,p.brand].filter(Boolean).join(' / '))+'</td><td class="price">¥'+Number(p.price).toFixed(2)+'</td><td>'+esc(p.id)+'</td></tr>').join('');
+    if(records.length>100)$('message').textContent+=' 当前只预览前 100 件，导出会包含全部识别结果。';
+    $('download').disabled=!records.length;$('downloadJson').disabled=!records.length;
+  }
+  function esc(v){return safeStr(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  function csvCell(v){const s=safeStr(v);return /[",\r\n]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s}
+  function save(name,content,type){
+    const blob=new Blob(['\ufeff',content],{type});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download=name;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),1000);
+  }
+  function decodeFile(file){
+    return file.text().then(text=>{try{return JSON.parse(text)}catch(e){throw new Error('无法解析 JSON。若这是 HAR，请确保导出格式为 JSON/HAR，而不是 .chls 等专有格式。')}});
+  }
+  $('readFile').addEventListener('click',async()=>{
+    const file=$('file').files[0];if(!file){alert('请先选择 JSON 或 HAR 文件。');return}
+    try{const payload=await decodeFile(file);parsePayload(payload)}catch(e){alert(e.message||'文件读取失败')}
+  });
+  $('parseText').addEventListener('click',()=>{
+    try{const payload=JSON.parse($('raw').value);parsePayload(payload)}catch(e){alert('JSON 解析失败：请粘贴完整响应 JSON，而不是纯文本。')}
+  });
+  $('download').addEventListener('click',()=>{
+    const header=['name','price','image_url','category','brand','tag','product_url','description'];
+    const lines=[header.join(','),...records.map(p=>[p.name,p.price.toFixed(2),p.image_url,p.category,p.brand,p.tag,p.product_url,p.description].map(csvCell).join(','))];
+    save('sam-global-buy-products.csv',lines.join('\r\n'),'text/csv;charset=utf-8');
+  });
+  $('downloadJson').addEventListener('click',()=>save('sam-global-buy-products.json',JSON.stringify(records,null,2),'application/json;charset=utf-8'));
+  $('clear').addEventListener('click',()=>{$('file').value='';$('raw').value='';$('result').classList.add('hidden');records=[]});
+})();
+</script>
+</body>
+</html>
