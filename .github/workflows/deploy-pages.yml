@@ -20,13 +20,16 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      - name: Prepare site bundle
+      - name: Assemble and validate site archive
         run: |
           mkdir -p dist
-          cat bundle/part-*.b64 | base64 --decode > /tmp/sam-global-buy.zip
+          cat payload/*.b64 | base64 --decode > /tmp/sam-global-buy.zip
+          unzip -tq /tmp/sam-global-buy.zip
           unzip -q /tmp/sam-global-buy.zip -d dist
           test -f dist/index.html
           test -f dist/app.js
+          test -f dist/styles.css
+          test -f dist/database.sql
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload site artifact
