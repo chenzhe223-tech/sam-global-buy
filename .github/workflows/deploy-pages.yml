@@ -30,6 +30,8 @@ jobs:
           test -f dist/app.js
           test -f dist/styles.css
           test -f dist/database.sql
+          cp sam-app-import.html dist/sam-app-import.html
+          test -f dist/sam-app-import.html
       - name: Configure Pages
         uses: actions/configure-pages@v5
       - name: Upload site artifact
