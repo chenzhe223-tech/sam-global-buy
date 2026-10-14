@@ -59,3 +59,19 @@ GitHub Pages 只负责托管静态网页，不能保存跨设备共享订单。�
 ## Deployment check
 
 After enabling GitHub Pages with **GitHub Actions** as the source, a new push to `main` triggers deployment automatically. See the latest run at [Actions](https://github.com/chenzhe223-tech/sam-global-buy/actions).
+
+
+## 从山姆 App 导入真实商品（新）
+
+已新增本地浏览器数据转换页：  
+**https://chenzhe223-tech.github.io/sam-global-buy/sam-app-import.html**
+
+此页面可解析你通过正常 App 使用过程合法导出的商品列表 JSON，或带有接口响应正文的 HAR，提取商品名称、图片、价格、ID、可能存在的商品链接，生成选品后台支持的 CSV。它只在浏览器本地处理你选中的文件，不上传 HAR 或登录态。
+
+步骤：
+1. 从山姆 App 全球购列表获取你已获授权访问的商品数据响应，并保存成 JSON/HAR。不要分享包含 Cookie、auth-token、手机号、地址或其他个人信息的原始 HAR。
+2. 打开导入页，选择文件或粘贴 **响应正文 JSON**，点击解析。
+3. 核对商品名称、图片、价格和商品 ID，下载 CSV。
+4. 在好物清单后台 → 商品管理 → 导入 CSV。
+
+这一步是“真实数据导入”，不是持续的实时 API 同步。当前未把山姆 App 登录凭据写入网页、GitHub 或 Supabase，也没有使用未知的官方授权接口。若要自动定时刷新，需先获得可持续合法使用的数据接口/数据授权，并在私有后端安全存放凭据。实际售价、库存和规格请在山姆 App 最终确认。
