@@ -54,3 +54,8 @@ GitHub Pages 只负责托管静态网页，不能保存跨设备共享订单。�
 - 商品价格是选购时参考值，订单里的金额只用于预估与对账，必须以实际下单记录为准。
 - 本工具不是山姆官方页面，不收集微信支付密码、不处理支付 API，也不会自动发送微信消息。
 - 公开链接可能被转发，只向信任的亲友分享。不要填写身份证、银行卡号等完成代购不需要的敏感信息。
+
+
+## Deployment check
+
+After enabling GitHub Pages with **GitHub Actions** as the source, a new push to `main` triggers deployment automatically. See the latest run at [Actions](https://github.com/chenzhe223-tech/sam-global-buy/actions).
